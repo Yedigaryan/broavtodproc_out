@@ -1,0 +1,164 @@
+# Bravo Driving School — Apache config for the static `next export` build.
+# Lives in /public/.htaccess so Next copies it into out/.htaccess at build time.
+# Tested against Apache 2.4 on shared hosting (cPanel-style) and on stand-alone Apache.
+
+# ----------------------------------------------------------------------
+# 1. Default document & directory listings
+# ----------------------------------------------------------------------
+DirectoryIndex index.html
+Options -Indexes
+
+# `next export` emits a same-named directory next to every <route>.html
+# (full of RSC payloads). Without this, mod_dir would 301 `/about` to
+# `/about/` because the directory exists, fighting our trailing-slash
+# rewrite below and producing a redirect loop. Disable it and let
+# mod_rewrite do the routing.
+<IfModule mod_dir.c>
+    DirectorySlash Off
+</IfModule>
+
+# ----------------------------------------------------------------------
+# 2. Clean URL routing
+#
+# `next export` emits one .html per route ALONGSIDE a same-named directory
+# of RSC payloads (e.g. /about.html + /about/__next._tree.txt). We:
+#   - serve real files untouched,
+#   - strip a trailing slash from non-root routes (so `/about/` -> `/about`),
+#   - serve `<route>.html` when the visitor types `/<route>` with no extension,
+#   - leave anything still unmatched for Apache's built-in 404 handler so
+#     it returns the correct HTTP 404 status (good for SEO/crawlers).
+# ----------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Don't touch real files.
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # `/about/` (trailing slash, but the directory has no index.html) -> /about
+    RewriteCond %{REQUEST_URI} ^/(.+)/$
+    RewriteCond %{DOCUMENT_ROOT}/%1.html -f
+    RewriteRule ^(.+)/$ /$1 [R=301,L]
+
+    # `/about` -> serve /about.html
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME}.html -f
+    RewriteRule ^(.+?)/?$ $1.html [L]
+</IfModule>
+
+ErrorDocument 404 /404.html
+ErrorDocument 403 /404.html
+
+# ----------------------------------------------------------------------
+# 3. Compression — text resources are highly compressible
+# ----------------------------------------------------------------------
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE image/svg+xml
+    AddOutputFilterByType DEFLATE font/ttf
+    AddOutputFilterByType DEFLATE font/otf
+    AddOutputFilterByType DEFLATE application/font-woff
+</IfModule>
+
+# Pre-compressed .br / .gz already on disk (if your toolchain ever emits them).
+<IfModule mod_headers.c>
+    <FilesMatch "\.(html|css|js|svg|json)\.gz$">
+        AddEncoding gzip .gz
+        Header append Vary Accept-Encoding
+    </FilesMatch>
+    <FilesMatch "\.(html|css|js|svg|json)\.br$">
+        AddEncoding br .br
+        Header append Vary Accept-Encoding
+    </FilesMatch>
+</IfModule>
+
+# ----------------------------------------------------------------------
+# 4. Cache control
+#   - Hashed Next.js bundles under /_next/static/  -> immutable for 1 year.
+#   - Other assets                                 -> 30 days.
+#   - HTML                                         -> always revalidate.
+# ----------------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+
+    ExpiresDefault                              "access plus 1 month"
+
+    # HTML — always revalidate so deploys are picked up immediately.
+    ExpiresByType text/html                     "access plus 0 seconds"
+
+    # Long-lived static assets.
+    ExpiresByType text/css                      "access plus 1 month"
+    ExpiresByType application/javascript        "access plus 1 month"
+    ExpiresByType image/png                     "access plus 1 month"
+    ExpiresByType image/jpeg                    "access plus 1 month"
+    ExpiresByType image/gif                     "access plus 1 month"
+    ExpiresByType image/webp                    "access plus 1 month"
+    ExpiresByType image/svg+xml                 "access plus 1 month"
+    ExpiresByType image/x-icon                  "access plus 1 month"
+    ExpiresByType font/woff                     "access plus 1 year"
+    ExpiresByType font/woff2                    "access plus 1 year"
+    ExpiresByType application/font-woff         "access plus 1 year"
+    ExpiresByType application/font-woff2        "access plus 1 year"
+</IfModule>
+
+<IfModule mod_setenvif.c>
+    # Tag every static-asset request as CC_LONG (30-day cache) and every
+    # /_next/static/* request as CC_IMMUTABLE. Then drop CC_LONG when
+    # CC_IMMUTABLE is set so the two flags are mutually exclusive — that
+    # lets us write two unscoped Header rules and have exactly one fire.
+    # `<Files>`-scoped Header directives merge AFTER unscoped ones in
+    # .htaccess, so we deliberately avoid <FilesMatch> for these.
+    SetEnvIf Request_URI "\.(js|css|woff2?|png|jpe?g|gif|webp|svg|ico)$" CC_LONG=1
+    SetEnvIf Request_URI "^/_next/static/" CC_IMMUTABLE=1
+    SetEnvIf CC_IMMUTABLE "1" !CC_LONG
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=2592000"                 env=CC_LONG
+    Header set Cache-Control "public, max-age=31536000, immutable"     env=CC_IMMUTABLE
+
+    # Always-revalidate for HTML so users get the latest deploy.
+    <FilesMatch "\.html$">
+        Header set Cache-Control "public, max-age=0, must-revalidate"
+    </FilesMatch>
+</IfModule>
+
+# ----------------------------------------------------------------------
+# 5. Security headers
+# ----------------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    # HSTS — uncomment once HTTPS is fully enforced on the production domain.
+    # Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
+
+# ----------------------------------------------------------------------
+# 6. MIME types Apache sometimes ships without
+# ----------------------------------------------------------------------
+<IfModule mod_mime.c>
+    AddType image/svg+xml                       .svg .svgz
+    AddType image/webp                          .webp
+    AddType font/woff                           .woff
+    AddType font/woff2                          .woff2
+    AddType application/manifest+json           .webmanifest
+    AddType text/cache-manifest                 .appcache
+</IfModule>
+
+# ----------------------------------------------------------------------
+# 7. Hide dotfiles (this file included)
+# ----------------------------------------------------------------------
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
