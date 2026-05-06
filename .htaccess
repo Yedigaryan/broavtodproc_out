@@ -32,6 +32,12 @@ Options -Indexes
     RewriteEngine On
     RewriteBase /
 
+    # Force HTTPS — assumes Let's Encrypt / cPanel SSL is enabled on the
+    # production domain. Comment out this block if you're testing over HTTP.
+    RewriteCond %{HTTPS} off
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
     # Don't touch real files.
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
