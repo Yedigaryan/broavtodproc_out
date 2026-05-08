@@ -1,0 +1,16 @@
+---
+# Auto-deploy hook for cPanel "Git Version Control".
+# Lives in /public/.cpanel.yml so Next.js copies it into out/.cpanel.yml at
+# build time, where our deploy script then rsyncs it into the broavtodproc_out
+# repo. After every pnpm deploy, click "Update from Remote" → "Deploy HEAD"
+# in cPanel and these tasks run on the host.
+#
+# Docs: https://docs.cpanel.net/cpanel/files/git-version-control/
+#
+# Doc-root detection: the addon-domain path is tried first; if it doesn't
+# exist we fall back to the primary-domain path. Edit by hand only if neither
+# matches your hosting layout.
+
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/davidbro/public_html && [ -d /home/davidbro/domains/bravoavtodproc.am/public_html ] && export DEPLOYPATH=/home/davidbro/domains/bravoavtodproc.am/public_html; /usr/bin/rsync -a --delete --exclude='.git' --exclude='.cpanel.yml' ./ "$DEPLOYPATH/"
