@@ -7,10 +7,19 @@
 #
 # Docs: https://docs.cpanel.net/cpanel/files/git-version-control/
 #
-# Doc-root detection: the addon-domain path is tried first; if it doesn't
-# exist we fall back to the primary-domain path. Edit by hand only if neither
-# matches your hosting layout.
+# We use `cp -a` instead of `rsync` because cPanel's rsync wrapper inherits
+# a CVS-style filter that silently drops files matching `*~` (editor backup
+# convention). Turbopack's content hashes can end in `~` (e.g.
+# `11393-zqp6bk~.js`), which collides with that filter and leaves the
+# deployed page broken with ChunkLoadError. `cp -a` has no filename
+# heuristics.
+#
+# For "delete stale chunks" semantics we wipe `_next/` before each copy —
+# every Next.js asset that's content-hashed lives under that directory, so
+# clearing it ensures no abandoned bundles accumulate.
+#
+# Doc-root detection: addon-domain path first, primary-domain fallback.
 
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/davidbro/public_html && [ -d /home/davidbro/domains/bravoavtodproc.am/public_html ] && export DEPLOYPATH=/home/davidbro/domains/bravoavtodproc.am/public_html; /usr/bin/rsync -a --delete --exclude='.git' --exclude='.cpanel.yml' ./ "$DEPLOYPATH/"
+    - export DEPLOYPATH=/home/davidbro/public_html && [ -d /home/davidbro/domains/bravoavtodproc.am/public_html ] && export DEPLOYPATH=/home/davidbro/domains/bravoavtodproc.am/public_html; /bin/rm -rf "$DEPLOYPATH/_next"; /bin/cp -a ./. "$DEPLOYPATH/"; /bin/rm -rf "$DEPLOYPATH/.git" "$DEPLOYPATH/.cpanel.yml"
