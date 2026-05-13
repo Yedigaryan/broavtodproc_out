@@ -7,6 +7,14 @@
 #
 # Docs: https://docs.cpanel.net/cpanel/files/git-version-control/
 #
+# IMPORTANT — doc root is hardcoded.
+# bravoavtodproc.am is the primary domain on this cPanel account, so its
+# document root is /home/davidbro/public_html. An auto-detection conditional
+# was here previously; cPanel had pre-created a /domains/bravoavtodproc.am/
+# placeholder which is NOT actually served, and the conditional flipped
+# DEPLOYPATH to that ghost directory, breaking deploys. Don't reintroduce
+# auto-detection.
+#
 # We use `cp -a` instead of `rsync` because cPanel's rsync wrapper inherits
 # a CVS-style filter that silently drops files matching `*~` (editor backup
 # convention). Turbopack's content hashes can end in `~` (e.g.
@@ -14,12 +22,10 @@
 # deployed page broken with ChunkLoadError. `cp -a` has no filename
 # heuristics.
 #
-# For "delete stale chunks" semantics we wipe `_next/` before each copy —
-# every Next.js asset that's content-hashed lives under that directory, so
-# clearing it ensures no abandoned bundles accumulate.
-#
-# Doc-root detection: addon-domain path first, primary-domain fallback.
+# Stale-chunk cleanup: we wipe `_next/` before each copy. Every
+# content-hashed Next.js asset lives under that directory, so clearing it
+# ensures no abandoned bundles accumulate.
 
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/davidbro/public_html && [ -d /home/davidbro/domains/bravoavtodproc.am/public_html ] && export DEPLOYPATH=/home/davidbro/domains/bravoavtodproc.am/public_html; /bin/rm -rf "$DEPLOYPATH/_next"; /bin/cp -a ./. "$DEPLOYPATH/"; /bin/rm -rf "$DEPLOYPATH/.git" "$DEPLOYPATH/.cpanel.yml"
+    - export DEPLOYPATH=/home/davidbro/public_html; /bin/rm -rf "$DEPLOYPATH/_next"; /bin/cp -a ./. "$DEPLOYPATH/"; /bin/rm -rf "$DEPLOYPATH/.git" "$DEPLOYPATH/.cpanel.yml"
