@@ -28,4 +28,8 @@
 
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/davidbro/public_html; /bin/rm -rf "$DEPLOYPATH/_next"; /bin/cp -a ./. "$DEPLOYPATH/"; /bin/rm -rf "$DEPLOYPATH/.git" "$DEPLOYPATH/.cpanel.yml"
+    # Single chained shell pipeline. We log everything to ~/bravo-deploy.log
+    # so the result is inspectable even if cPanel's UI swallows task output.
+    # After running cPanel "Deploy HEAD", cat that log in cPanel File Manager
+    # or Terminal to confirm what actually happened.
+    - export DEPLOYPATH=/home/davidbro/public_html; LOG=/home/davidbro/bravo-deploy.log; { echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) deploy start ==="; echo "cwd: $(pwd)"; echo "whoami: $(whoami)"; echo "DEPLOYPATH=$DEPLOYPATH"; echo "git HEAD: $(git rev-parse --short HEAD 2>&1 || echo n/a)"; echo "source file count: $(find . -type f ! -path './.git/*' | wc -l)"; echo "--- before: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "--- rm _next ---"; /bin/rm -rf "$DEPLOYPATH/_next" 2>&1; echo "--- cp -a ---"; /bin/cp -a ./. "$DEPLOYPATH/" 2>&1; echo "cp exit: $?"; /bin/rm -rf "$DEPLOYPATH/.git" "$DEPLOYPATH/.cpanel.yml" 2>&1; echo "--- after: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "index.html size: $(wc -c < "$DEPLOYPATH/index.html" 2>&1)"; echo "=== done ==="; } > "$LOG" 2>&1
