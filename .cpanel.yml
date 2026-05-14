@@ -8,12 +8,11 @@
 # Docs: https://docs.cpanel.net/cpanel/files/git-version-control/
 #
 # IMPORTANT — doc root is hardcoded.
-# bravoavtodproc.am is the primary domain on this cPanel account, so its
-# document root is /home/davidbro/public_html. An auto-detection conditional
-# was here previously; cPanel had pre-created a /domains/bravoavtodproc.am/
-# placeholder which is NOT actually served, and the conditional flipped
-# DEPLOYPATH to that ghost directory, breaking deploys. Don't reintroduce
-# auto-detection.
+# The /public_html paths on this host belong to a different cPanel context
+# than the FTP user can write to, so we deploy into a dedicated folder
+# at /home/davidbro/bravoavtodproc/ instead. The cPanel "Domains" UI must
+# be set to point bravoavtodproc.am's document root at this folder for the
+# site to actually serve.
 #
 # We use `cp -a` instead of `rsync` because cPanel's rsync wrapper inherits
 # a CVS-style filter that silently drops files matching `*~` (editor backup
@@ -32,4 +31,4 @@ deployment:
     # so the result is inspectable even if cPanel's UI swallows task output.
     # After running cPanel "Deploy HEAD", cat that log in cPanel File Manager
     # or Terminal to confirm what actually happened.
-    - export DEPLOYPATH=/home/davidbro/public_html; LOG=/home/davidbro/bravo-deploy.log; { echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) deploy start ==="; echo "cwd: $(pwd)"; echo "whoami: $(whoami)"; echo "DEPLOYPATH=$DEPLOYPATH"; echo "git HEAD: $(git rev-parse --short HEAD 2>&1 || echo n/a)"; echo "source file count: $(find . -type f ! -path './.git/*' | wc -l)"; echo "--- before: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "--- rm _next ---"; /bin/rm -rf "$DEPLOYPATH/_next" 2>&1; echo "--- cp -a ---"; /bin/cp -a ./. "$DEPLOYPATH/" 2>&1; echo "cp exit: $?"; /bin/rm -rf "$DEPLOYPATH/.git" "$DEPLOYPATH/.cpanel.yml" 2>&1; echo "--- after: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "index.html size: $(wc -c < "$DEPLOYPATH/index.html" 2>&1)"; echo "=== done ==="; } > "$LOG" 2>&1
+    - export DEPLOYPATH=/home/davidbro/bravoavtodproc; LOG=/home/davidbro/bravo-deploy.log; { echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) deploy start ==="; echo "cwd: $(pwd)"; echo "whoami: $(whoami)"; echo "DEPLOYPATH=$DEPLOYPATH"; echo "git HEAD: $(git rev-parse --short HEAD 2>&1 || echo n/a)"; echo "source file count: $(find . -type f ! -path './.git/*' | wc -l)"; mkdir -p "$DEPLOYPATH"; echo "--- before: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "--- rm _next ---"; /bin/rm -rf "$DEPLOYPATH/_next" 2>&1; echo "--- cp -a ---"; /bin/cp -a ./. "$DEPLOYPATH/" 2>&1; echo "cp exit: $?"; /bin/rm -rf "$DEPLOYPATH/.git" "$DEPLOYPATH/.cpanel.yml" 2>&1; echo "--- after: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "index.html size: $(wc -c < "$DEPLOYPATH/index.html" 2>&1)"; echo "=== done ==="; } > "$LOG" 2>&1
