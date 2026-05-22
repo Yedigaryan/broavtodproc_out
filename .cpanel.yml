@@ -31,4 +31,11 @@ deployment:
     # so the result is inspectable even if cPanel's UI swallows task output.
     # After running cPanel "Deploy HEAD", cat that log in cPanel File Manager
     # or Terminal to confirm what actually happened.
-    - export DEPLOYPATH=/home/davidbro/public_html; LOG=/home/davidbro/bravo-deploy.log; { echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) deploy start ==="; echo "cwd: $(pwd)"; echo "whoami: $(whoami)"; echo "DEPLOYPATH=$DEPLOYPATH"; echo "git HEAD: $(git rev-parse --short HEAD 2>&1 || echo n/a)"; echo "source file count: $(find . -type f ! -path './.git/*' | wc -l)"; mkdir -p "$DEPLOYPATH"; echo "--- before: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "--- rm _next ---"; /bin/rm -rf "$DEPLOYPATH/_next" 2>&1; echo "--- cp -a ---"; /bin/cp -a ./. "$DEPLOYPATH/" 2>&1; echo "cp exit: $?"; /bin/rm -rf "$DEPLOYPATH/.git" "$DEPLOYPATH/.cpanel.yml" 2>&1; echo "--- after: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "index.html size: $(wc -c < "$DEPLOYPATH/index.html" 2>&1)"; echo "=== done ==="; } > "$LOG" 2>&1
+    #
+    # NOTE: this task MUST be a YAML block scalar (`- |`). The command body
+    # contains `colon-space` sequences (e.g. `cp exit: ...`) which, in a plain
+    # unquoted scalar, YAML parses as a key/value map — making cPanel reject
+    # the whole file with "A valid .cpanel.yml file exists". The `|` keeps
+    # every character literal.
+    - |
+      export DEPLOYPATH=/home/davidbro/public_html; LOG=/home/davidbro/bravo-deploy.log; { echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) deploy start ==="; echo "cwd: $(pwd)"; echo "whoami: $(whoami)"; echo "DEPLOYPATH=$DEPLOYPATH"; echo "git HEAD: $(git rev-parse --short HEAD 2>&1 || echo n/a)"; echo "source file count: $(find . -type f ! -path './.git/*' | wc -l)"; mkdir -p "$DEPLOYPATH"; echo "--- before: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "--- rm _next ---"; /bin/rm -rf "$DEPLOYPATH/_next" 2>&1; echo "--- cp -a ---"; /bin/cp -a ./. "$DEPLOYPATH/" 2>&1; echo "cp exit: $?"; /bin/rm -rf "$DEPLOYPATH/.git" "$DEPLOYPATH/.cpanel.yml" 2>&1; echo "--- after: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "index.html size: $(wc -c < "$DEPLOYPATH/index.html" 2>&1)"; echo "=== done ==="; } > "$LOG" 2>&1
