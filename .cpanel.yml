@@ -1,41 +1,25 @@
 ---
-# Auto-deploy hook for cPanel "Git Version Control".
-# Lives in /public/.cpanel.yml so Next.js copies it into out/.cpanel.yml at
-# build time, where our deploy script then rsyncs it into the broavtodproc_out
-# repo. After every pnpm deploy, click "Update from Remote" → "Deploy HEAD"
-# in cPanel and these tasks run on the host.
+# cPanel "Git Version Control" config for bravoavtodproc.am.
 #
 # Docs: https://docs.cpanel.net/cpanel/files/git-version-control/
 #
-# IMPORTANT — doc root is hardcoded.
-# bravoavtodproc.am's document root is /home/davidbro/public_html and is not
-# changeable in the cPanel "Domains" UI, so we deploy straight into it. The
-# Git Version Control deploy task runs as the cPanel account user (davidbro),
-# which owns public_html, so `cp -a` into it works fine — this is a different
-# context than the FTP user, which cannot.
+# IMPORTANT — there are intentionally NO deployment tasks.
 #
-# We use `cp -a` instead of `rsync` because cPanel's rsync wrapper inherits
-# a CVS-style filter that silently drops files matching `*~` (editor backup
-# convention). Turbopack's content hashes can end in `~` (e.g.
-# `11393-zqp6bk~.js`), which collides with that filter and leaves the
-# deployed page broken with ChunkLoadError. `cp -a` has no filename
-# heuristics.
+# This repository's Repository Path IS the document root
+# (/home/davidbro/public_html). Because the git working tree and the doc
+# root are the same directory, clicking "Update from Remote" in cPanel
+# pulls the latest commit straight into the live site — that single action
+# IS the deploy. No copy step is needed.
 #
-# Stale-chunk cleanup: we wipe `_next/` before each copy. Every
-# content-hashed Next.js asset lives under that directory, so clearing it
-# ensures no abandoned bundles accumulate.
+# A previous version of this file ran `cp -a` plus
+# `rm -rf "$DEPLOYPATH/.git"` with DEPLOYPATH=public_html. Since the repo
+# lives in public_html, that task would have deleted the repo's own .git
+# directory and copied the tree onto itself. It is removed deliberately —
+# do not re-add deployment tasks unless the repo is moved OUT of the doc
+# root.
+#
+# Publish flow: `pnpm run deploy` (build + push to broavtodproc_out) then
+# cPanel → Git Version Control → "Update from Remote". Done.
 
 deployment:
-  tasks:
-    # Single chained shell pipeline. We log everything to ~/bravo-deploy.log
-    # so the result is inspectable even if cPanel's UI swallows task output.
-    # After running cPanel "Deploy HEAD", cat that log in cPanel File Manager
-    # or Terminal to confirm what actually happened.
-    #
-    # NOTE: this task MUST be a YAML block scalar (`- |`). The command body
-    # contains `colon-space` sequences (e.g. `cp exit: ...`) which, in a plain
-    # unquoted scalar, YAML parses as a key/value map — making cPanel reject
-    # the whole file with "A valid .cpanel.yml file exists". The `|` keeps
-    # every character literal.
-    - |
-      export DEPLOYPATH=/home/davidbro/public_html; LOG=/home/davidbro/bravo-deploy.log; { echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) deploy start ==="; echo "cwd: $(pwd)"; echo "whoami: $(whoami)"; echo "DEPLOYPATH=$DEPLOYPATH"; echo "git HEAD: $(git rev-parse --short HEAD 2>&1 || echo n/a)"; echo "source file count: $(find . -type f ! -path './.git/*' | wc -l)"; mkdir -p "$DEPLOYPATH"; echo "--- before: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "--- rm _next ---"; /bin/rm -rf "$DEPLOYPATH/_next" 2>&1; echo "--- cp -a ---"; /bin/cp -a ./. "$DEPLOYPATH/" 2>&1; echo "cp exit: $?"; /bin/rm -rf "$DEPLOYPATH/.git" "$DEPLOYPATH/.cpanel.yml" 2>&1; echo "--- after: $DEPLOYPATH ---"; ls -la "$DEPLOYPATH" 2>&1 | head -20; echo "index.html size: $(wc -c < "$DEPLOYPATH/index.html" 2>&1)"; echo "=== done ==="; } > "$LOG" 2>&1
+  tasks: []
